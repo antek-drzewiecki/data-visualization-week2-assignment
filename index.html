@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+<title>Global Temperature Earth</title>
+<script src="jquery.min.js"></script>
+<script src="d3.min.js"></script>
+<script src="legend.js"></script>
+<script src="data.js"></script>
+
+<style>
+
+body {
+  font: 10px sans-serif;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+.legend rect {
+  fill:white;
+  stroke:black;
+  opacity:0.8;}
+
+.tick line{
+    opacity: 0.2;
+  }
+
+.line {
+  fill: none;
+  stroke: steelblue;
+  stroke-width: 1.5px;
+}
+
+
+</style>
+</head>
+
+<body>
+
+</body>
+
+<script>
+var margin = {top: 20, right: 150, bottom: 30, left: 50},
+    width = 1100 - margin.left - margin.right,
+    height = 500 - margin.top - margin.bottom;
+
+var defaultShown = ["Glob", "NHem", "SHem"]
+
+var parseDate = d3.time.format("%Y").parse;
+var format = d3.time.format( '%Y' );
+var bisectDate = d3.bisector(function(d) { return d.Year; }).left;
+
+var x = d3.time.scale()
+.range([0, width]);
+
+var y = d3.scale.linear()
+    .range([height, 0]);
+
+var color = d3.scale.category20();
+
+var xAxis = d3.svg.axis()
+    .scale(x)
+    .tickFormat(d3.time.format('%Y'))
+    .innerTickSize(-height)
+    .outerTickSize(0)
+    .tickPadding(10)
+    .orient("bottom");
+
+var yAxis = d3.svg.axis()
+    .scale(y)
+    .innerTickSize(-width)
+    .outerTickSize(0)
+    .tickPadding(10)
+    .orient("left");
+
+var line = d3.svg.line()
+    .interpolate("basis")
+    .x(function(d) { return x(d.date); })
+    .y(function(d) { return y(d.temperature); });
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+
+  var xLineGroup = svg.append("g")
+            .attr("class", "hover-line");
+
+  var hoverLine = xLineGroup
+        .append("line")
+            .attr("id", "hover-line")
+            .attr("x1", 10).attr("x2", 10)
+            .attr("y1", 0).attr("y2", height + 10)
+            .style("stroke-dasharray", "3,3")
+            .style("pointer-events", "none")
+            .style("opacity", 0)
+            .style("stroke", "blue");
+
+var hoverDate = xLineGroup
+        .append('text')
+            .attr("class", "hover-text")
+            .attr("y", height - (height-30))
+            .attr("x", 10)
+            .style("fill", "#CCCCCC");
+
+function draw(data) {
+
+  color.domain(d3.keys(data[0]).filter(function(key) { return key !== "Year"; }));
+
+  data.forEach(function(d) {
+    d.Year = parseDate(String(d.Year));
+    d.active = defaultShown.indexOf(d.name) > -1;
+  });
+
+  var coordinates = color.domain().map(function(name) {
+    return {
+      name: name,
+      active: defaultShown.indexOf(name) > -1,
+      values: data.map(function(d) {
+        return {date: d.Year, temperature: +d[name]};
+      })
+    };
+  });
+
+  x.domain(d3.extent(data, function(d) { return d.Year; }));
+
+  y.domain([
+    d3.min(coordinates, function(c) { return d3.min(c.values, function(v) { return v.temperature; }); }),
+    d3.max(coordinates, function(c) { return d3.max(c.values, function(v) { return v.temperature; }); })
+  ]);
+
+  svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis)
+    .append("text")
+      .attr("y", 15)
+      .attr("x", width/2)
+      .attr("dy", ".9em")
+      .style("text-anchor", "end")
+      .text("Year");
+
+  svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+    .append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 6)
+      .attr("dy", ".9em")
+      .style("text-anchor", "end")
+      .text("Temperature Anomaly(ºC)");
+
+
+  var coordinate = svg.selectAll(".coordinate")
+      .data(coordinates)
+      .enter().append("g")
+      .attr("class", "coordinate");
+
+  coordinate.append("path")
+      .attr("class", "line")
+      .attr("d", function(d) { return line(d.values); })
+      .attr("id", function(d) {return 'tag'+d.name.replace(/\s+/g, ''); })
+      .attr('active', function(d) { return (defaultShown.indexOf(d.name) > -1) ? 1 : 0})
+      .attr("data-legend",function(d) { return d.name})
+      .style("opacity", function(d) {
+        return d.active ? 1 : 0; })
+      .style('stroke-width', 1)
+      .style("stroke", function(d) { return color(d.name); })
+    coordinate.selectAll('.point')
+    .data(function(d){ return d })
+
+    svg.append("rect")
+        .attr("width", width)
+        .attr("height", height)
+        .style("fill", "none")
+        .style("pointer-events", "all")
+        .on("mousemove", mousemove);
+
+
+  legend = svg.append("g")
+  .attr("class","legend")
+  .attr("transform","translate("+(width+20)+",30)")
+  .style("font-size","12px")
+  .call(d3.legend);
+};
+
+
+function mousemove() {
+    var x0 = x.invert(d3.mouse(this)[0]),
+        i = bisectDate(data, x0, 1),
+        d0 = data[i - 1],
+        d1 = data[i],
+        d = x0 - d0.date > d1.date - x0 ? d1 : d0;
+
+    hoverDate.text("Year " + format(x0));
+
+    d3.select("#hover-line") // select hover-line and changing attributes to mouse position
+          .attr("x1", x(x0))
+          .attr("x2", x(x0))
+          .style("opacity", 1); // Making line visible
+    hoverDate.attr("x", (x(x0) > width - 200) ? x(x0) - 60 :  x(x0) + 10 )
+
+    legend.selectAll("text.tooltip").text(function(columnName){
+         return (d[columnName.key]);
+      });
+
+  }
+
+draw(data);
+</script>
+</html>
