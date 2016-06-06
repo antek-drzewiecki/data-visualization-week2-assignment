@@ -32,7 +32,7 @@ d3.legend = function(g) {
         .call(function(d) { d.enter().append("text")})
         .call(function(d) { d.exit().remove()})
         .attr("y",function(d,i) { return (i*1.5)+"em"})
-        .attr("x","3em")
+        .attr("x","3.7em")
         .attr("class","name")
         .text(function(d) { return d.key})
         .style("fill", function(d) { return d.value.active ? "#000" : "CCC"})
